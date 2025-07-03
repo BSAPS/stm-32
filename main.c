@@ -43,6 +43,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
@@ -50,6 +51,20 @@ UART_HandleTypeDef huart1;
 #define STX 0x02
 #define ETX 0x03
 
+#define CMD_LCD_ON     0x01
+#define CMD_LCD_OFF    0x02
+
+#define RX_BUFFER_SIZE 256
+uint8_t rx_buffer[RX_BUFFER_SIZE];
+uint16_t rx_index = 0;
+
+#define CRC_INIT       0x0000
+#define CRC_POLY       0x8005
+#define IO_REF         1       
+#define XOR_OUT        0x0000
+
+#define MY_ID          1	//board number ID
+uint8_t rx_byte;	// For interrupt-based UART byte reception
 
 /* USER CODE END PV */
 
@@ -57,88 +72,182 @@ UART_HandleTypeDef huart1;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-void UART_SendFrame(uint8_t *data, uint16_t len);
+void UART_SendFrame(uint8_t cmd);
 void UART_ReceiveFrame(void);
+void ProcessCommand(uint8_t *data, uint16_t len);
+// crc calculation
+unsigned short reverse_value(unsigned short value, int bit);
+unsigned short crc16_calc(uint8_t *pData, int length);
 
+//interrupt
+void FSM_ParseByte(uint8_t rx);
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define RX_BUFFER_SIZE 256
-uint8_t rx_buffer[RX_BUFFER_SIZE];
-uint16_t rx_index = 0;
-void UART_SendFrame(uint8_t *data, uint16_t len) {
+
+
+int fputc(int ch, FILE *f)
+{
+    uint8_t temp[1]={ch};
+    HAL_UART_Transmit(&huart2, temp, 1, 2);
+  return(ch);
+}
+
+
+unsigned short reverse_value(unsigned short value, int bit)
+{
+    unsigned short ret = 0;
+    for (int i = 0; i < bit; i++) {
+        ret = (ret << 1) | ((value >> i) & 1);
+    }
+    return ret;
+}
+
+unsigned short crc16_calc(uint8_t *pData, int length)
+{
+    unsigned short crc = 0x0000;
+    while (length--) {
+        if (IO_REF == 0)
+            crc ^= *(unsigned char *)pData++ << 8;
+        else
+            crc ^= reverse_value(*pData++, 8) << 8;
+        for (int i = 0; i < 8; i++) {
+            crc = crc & 0x8000 ? (crc << 1) ^ 0x8005 : crc << 1;
+        }
+    }
+
+    if (IO_REF == 1)
+        crc = reverse_value(crc, 16);
+
+    return crc ^ 0x0000;
+}
+
+void UART_SendFrame(uint8_t cmd) {
     uint8_t start[] = {DLE, STX};
     uint8_t end[] = {DLE, ETX};
+		uint8_t frame[3]; // CMD + CRC(2byte)
+		
+		frame[0] = cmd;
+    unsigned short crc = crc16_calc(&cmd, 1);
+    frame[1] = (crc >> 8) & 0xFF; //
+    frame[2] = crc & 0xFF;
+		
 
     // ??? ?? ??
-    HAL_UART_Transmit(&huart1, start, 2, HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart2, start, 2, HAL_MAX_DELAY);
 
-    // ??? ??
-    for (int i = 0; i < len; i++) {
-        if (data[i] == DLE) {
+    for (int i = 0; i < 3; i++) {  //len
+        if (frame[i] == DLE) {
             uint8_t dle_escape[] = {DLE, DLE};
-            HAL_UART_Transmit(&huart1, dle_escape, 2, HAL_MAX_DELAY);
+            HAL_UART_Transmit(&huart2, dle_escape, 2, HAL_MAX_DELAY);
         } else {
-            HAL_UART_Transmit(&huart1, &data[i], 1, HAL_MAX_DELAY);
+            HAL_UART_Transmit(&huart2, &frame[i], 1, HAL_MAX_DELAY);
         }
     }
 
-    // ??? ?? ??
-    HAL_UART_Transmit(&huart1, end, 2, HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart2, end, 2, HAL_MAX_DELAY);
 }
 
+// UART receive FSM per byte, called from interrupt callback
+void FSM_ParseByte(uint8_t rx) {
+    static uint8_t dle_flag = 0;
+    static uint8_t receiving = 0;
 
-void UART_ReceiveFrame() {
-    uint8_t rx;
-    uint8_t receiving = 0;
-    uint8_t dle_flag = 0;
-
-    while (1) {
-        HAL_UART_Receive(&huart1, &rx, 1, HAL_MAX_DELAY);
-
-        if (!receiving) {
-            // ?? ??
-            if (dle_flag && rx == STX) {
-                // DLE + STX -> ??? ??
+    if (!receiving) {
+        if (dle_flag && rx == STX) {
+            rx_index = 0;
+            receiving = 1;
+            dle_flag = 0;
+        } else if (rx == DLE) {
+            dle_flag = 1;
+        } else {
+            dle_flag = 0;
+        }
+    } else {
+        if (dle_flag) {
+            if (rx == ETX) {
+                // End of frame ? process buffer
+                ProcessCommand(rx_buffer, rx_index);
+                receiving = 0;
                 rx_index = 0;
-                receiving = 1;
-                dle_flag = 0;
-                continue;
             } else if (rx == DLE) {
-                dle_flag = 1;
-                continue;
-            } else {
-                dle_flag = 0;
+                if (rx_index < RX_BUFFER_SIZE) rx_buffer[rx_index++] = DLE;
             }
+            dle_flag = 0;
+        } else if (rx == DLE) {
+            dle_flag = 1;
         } else {
-            // ?? ??
-            if (dle_flag) {
-                if (rx == ETX) {
-                    // DLE + ETX -> ??? ??
-                    // ??? ??? ?? ? ?? ??
-                    UART_SendFrame(rx_buffer, rx_index);
-                    rx_index = 0;
-                    receiving = 0;
-                } else if (rx == DLE) {
-                    // DLE + DLE -> ??? DLE
-                    if (rx_index < RX_BUFFER_SIZE) {
-                        rx_buffer[rx_index++] = DLE;
-                    }
-                }
-                dle_flag = 0;
-            } else if (rx == DLE) {
-                dle_flag = 1;
-            } else {
-                if (rx_index < RX_BUFFER_SIZE) {
-                    rx_buffer[rx_index++] = rx;
-                }
-            }
+            if (rx_index < RX_BUFFER_SIZE) rx_buffer[rx_index++] = rx;
         }
     }
 }
 
+
+
+
+// Called when a valid frame is received: [DST_MASK][CMD][CRC1][CRC2]
+void ProcessCommand(uint8_t *data, uint16_t len) {
+    if (len < 4) {
+        char *msg = "Invalid Frame Length\r\n";
+        HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+        return;
+    }
+
+    uint8_t dst_mask = data[0];
+    uint8_t cmd = data[1];
+    uint16_t recv_crc = (data[2] << 8) | data[3];
+    uint16_t calc_crc = crc16_calc(&data[0], 2);
+    //uint16_t calc_crc = crc16_calc(&cmd, 1);
+
+    if (recv_crc != calc_crc) {
+        char *msg = "CRC Error\r\n";
+        HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+        return;
+    }
+
+    if ((dst_mask >> (MY_ID - 1)) & 0x01) {
+    switch (cmd) {
+        case CMD_LCD_ON:
+            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+            {
+                char msg[64];
+                snprintf(msg, sizeof(msg), "[Board %d] LD2 ON\r\n", MY_ID);
+                HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+            }
+            break;
+        case CMD_LCD_OFF:
+            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+            {
+                char msg[64];
+                snprintf(msg, sizeof(msg), "[Board %d] LD2 OFF\r\n", MY_ID);
+                HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+            }
+            break;
+        default:
+            {
+                char msg[64];
+                snprintf(msg, sizeof(msg), "[Board %d] Unknown CMD\r\n", MY_ID);
+                HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+            }
+            break;
+						}
+		} else {
+				char msg[64];
+				snprintf(msg, sizeof(msg), "[Board %d] Ignored Frame\r\n", MY_ID);
+				HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+				}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART2) {
+        FSM_ParseByte(rx_byte);
+        HAL_UART_Receive_IT(&huart2, &rx_byte, 1);  // Continue receiving
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -172,10 +281,14 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  char *msg = "DLE-STX/ETX UART TEST START\r\n";
-  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-	UART_ReceiveFrame();
+  char *msg = "UART Bitmask FSM Receiver Start\r\n";
+  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+	//Test_CRC();
+	HAL_UART_Receive_IT(&huart2, &rx_byte, 1);  // Start interrupt receive
+
+	//UART_ReceiveFrame();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -265,6 +378,39 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -280,14 +426,14 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PA5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_5;
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
