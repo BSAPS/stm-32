@@ -23,7 +23,6 @@
 /* USER CODE BEGIN Includes */
 #include "string.h"
 #include "stdio.h"
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,13 +42,14 @@
 
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
-UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
 #define DLE 0x10
 #define STX 0x02
 #define ETX 0x03
+#define CMD_ACK   0xAA
+#define CMD_NACK  0x55
 
 #define CMD_LCD_ON     0x01
 #define CMD_LCD_OFF    0x02
@@ -63,8 +63,8 @@ uint16_t rx_index = 0;
 #define IO_REF         1       
 #define XOR_OUT        0x0000
 
-#define MY_ID          1	//board number ID
-uint8_t rx_byte;	// For interrupt-based UART byte reception
+#define MY_ID          1
+uint8_t rx_byte;
 
 /* USER CODE END PV */
 
@@ -72,16 +72,12 @@ uint8_t rx_byte;	// For interrupt-based UART byte reception
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
-static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 void UART_SendFrame(uint8_t cmd);
 void UART_ReceiveFrame(void);
 void ProcessCommand(uint8_t *data, uint16_t len);
-// crc calculation
 unsigned short reverse_value(unsigned short value, int bit);
 unsigned short crc16_calc(uint8_t *pData, int length);
-
-//interrupt
 void FSM_ParseByte(uint8_t rx);
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 /* USER CODE END PFP */
@@ -89,13 +85,21 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-
 int fputc(int ch, FILE *f)
 {
     uint8_t temp[1]={ch};
-    HAL_UART_Transmit(&huart2, temp, 1, 2);
-  return(ch);
+    HAL_UART_Transmit(&huart1, temp, 1, 2);
+    return ch;
 }
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART1) {
+        FSM_ParseByte(rx_byte);
+        HAL_UART_Receive_IT(&huart1, &rx_byte, 1);  // Continue receiving
+    }
+}
+
+
 
 
 unsigned short reverse_value(unsigned short value, int bit)
@@ -138,18 +142,18 @@ void UART_SendFrame(uint8_t cmd) {
 		
 
     // ??? ?? ??
-    HAL_UART_Transmit(&huart2, start, 2, HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart1, start, 2, HAL_MAX_DELAY);
 
     for (int i = 0; i < 3; i++) {  //len
         if (frame[i] == DLE) {
             uint8_t dle_escape[] = {DLE, DLE};
-            HAL_UART_Transmit(&huart2, dle_escape, 2, HAL_MAX_DELAY);
+            HAL_UART_Transmit(&huart1, dle_escape, 2, HAL_MAX_DELAY);
         } else {
-            HAL_UART_Transmit(&huart2, &frame[i], 1, HAL_MAX_DELAY);
+            HAL_UART_Transmit(&huart1, &frame[i], 1, HAL_MAX_DELAY);
         }
     }
 
-    HAL_UART_Transmit(&huart2, end, 2, HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart1, end, 2, HAL_MAX_DELAY);
 }
 
 // UART receive FSM per byte, called from interrupt callback
@@ -193,7 +197,7 @@ void FSM_ParseByte(uint8_t rx) {
 void ProcessCommand(uint8_t *data, uint16_t len) {
     if (len < 4) {
         char *msg = "Invalid Frame Length\r\n";
-        HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+        HAL_UART_Transmit(&huart1, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
         return;
     }
 
@@ -205,7 +209,8 @@ void ProcessCommand(uint8_t *data, uint16_t len) {
 
     if (recv_crc != calc_crc) {
         char *msg = "CRC Error\r\n";
-        HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+        HAL_UART_Transmit(&huart1, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+				UART_SendFrame(CMD_NACK); //send NACK
         return;
     }
 
@@ -216,7 +221,8 @@ void ProcessCommand(uint8_t *data, uint16_t len) {
             {
                 char msg[64];
                 snprintf(msg, sizeof(msg), "[Board %d] LD2 ON\r\n", MY_ID);
-                HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+                HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 50);
+								UART_SendFrame(CMD_ACK);
             }
             break;
         case CMD_LCD_OFF:
@@ -224,29 +230,23 @@ void ProcessCommand(uint8_t *data, uint16_t len) {
             {
                 char msg[64];
                 snprintf(msg, sizeof(msg), "[Board %d] LD2 OFF\r\n", MY_ID);
-                HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+                HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 50);
+								UART_SendFrame(CMD_ACK);
             }
             break;
         default:
             {
                 char msg[64];
                 snprintf(msg, sizeof(msg), "[Board %d] Unknown CMD\r\n", MY_ID);
-                HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+                HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 50);
             }
             break;
 						}
 		} else {
 				char msg[64];
 				snprintf(msg, sizeof(msg), "[Board %d] Ignored Frame\r\n", MY_ID);
-				HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 50);
+				HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 50);
 				}
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if (huart->Instance == USART2) {
-        FSM_ParseByte(rx_byte);
-        HAL_UART_Receive_IT(&huart2, &rx_byte, 1);  // Continue receiving
-    }
 }
 
 /* USER CODE END 0 */
@@ -259,7 +259,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -281,21 +281,18 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
-  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  char *msg = "UART Bitmask FSM Receiver Start\r\n";
-  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-	//Test_CRC();
-	HAL_UART_Receive_IT(&huart2, &rx_byte, 1);  // Start interrupt receive
 
-	//UART_ReceiveFrame();
+	char *msg = "UART Bitmask FSM Receiver Start\r\n";
+	HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+	HAL_UART_Receive_IT(&huart1, &rx_byte, 1);  // Start interrupt receive
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-				
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -323,7 +320,12 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 84;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -333,12 +335,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -374,39 +376,6 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART2_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART2_Init 0 */
-
-  /* USER CODE END USART2_Init 0 */
-
-  /* USER CODE BEGIN USART2_Init 1 */
-
-  /* USER CODE END USART2_Init 1 */
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
-
-  /* USER CODE END USART2_Init 2 */
 
 }
 
