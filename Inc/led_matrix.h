@@ -1,60 +1,50 @@
 #ifndef __LED_MATRIX_H
 #define __LED_MATRIX_H
 
-#include "main.h"  // Required for HAL and GPIO pin definitions
+#include "main.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// === Public Interface for LED Matrix Control ===
+#define HIGH GPIO_PIN_SET
+#define LOW  GPIO_PIN_RESET
 
-extern uint16_t upper_buffer[16];
-extern uint16_t lower_buffer[16];
+#define HUB75_WIDTH   64
+#define HUB75_HEIGHT  32
 
-typedef enum {
-    COLOR_BLACK = 0,
-    COLOR_RED,
-    COLOR_GREEN,
-    COLOR_BLUE,
-    COLOR_YELLOW,
-    COLOR_CYAN,
-    COLOR_MAGENTA,
-    COLOR_WHITE
-} LEDColor;
+/* ------------------- 프레임 버퍼 ------------------- */
+extern uint8_t rgb_framebuffer[HUB75_HEIGHT][HUB75_WIDTH][3];  // [row][col][RGB]
+//6kb
+/* ------------------- 핀 구조 정의 ------------------- */
+typedef struct {
+    GPIO_TypeDef* port;
+    uint16_t pin;
+} GPIO_Pin;
 
+typedef struct {
+    GPIO_Pin R1, G1, B1;
+    GPIO_Pin R2, G2, B2;
+    GPIO_Pin CLK, LAT, OE;
+    GPIO_Pin A, B, C, D;
+} HUB75_Pins;
 
-/**
- * @brief Initialize the LED matrix.
- *        Sets OE pin HIGH to turn off display initially.
- *        Also loads a default frame (e.g., all yellow).
- */
-void LEDMatrix_Init(void);
+// === extern ===
+extern uint8_t rgb_framebuffer[HUB75_HEIGHT][HUB75_WIDTH][3];
+extern HUB75_Pins mat_pins;
 
-/**
- * @brief Turn on the LED matrix display.
- */
+// === HUB75 function ===
+void pulse(GPIO_TypeDef* port, uint16_t pin);
+void set_row_address(uint8_t row);
+void setPixel(uint8_t row, uint8_t col, uint8_t r, uint8_t g, uint8_t b);
+void clearBuffer(void);
+void HUB75_UpdateScreen(void);
+// === power on/off ===
 void LEDMatrix_TurnOn(void);
-void LEDMatrix_SetColor(LEDColor color);
-
-/**
- * @brief Turn off the LED matrix display by setting OE HIGH.
- */
 void LEDMatrix_TurnOff(void);
-
-/**
- * @brief Update the current LED matrix frame.
- *        Call this periodically in the main loop or timer interrupt.
- */
-void LEDMatrix_Update(void);
-
-/**
- * @brief Set a new frame for the LED matrix.
- * 
- * @param upper 16 rows for the top half (R1, G1, B1)
- * @param lower 16 rows for the bottom half (R2, G2, B2)
- */
-void LEDMatrix_SetFrame(uint16_t upper[16], uint16_t lower[16]);
 
 #ifdef __cplusplus
 }

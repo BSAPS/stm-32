@@ -53,37 +53,38 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-extern TIM_HandleTypeDef htim10;
-extern UART_HandleTypeDef huart1;
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define A_Pin GPIO_PIN_0
+#define A_GPIO_Port GPIOC
+#define B_Pin GPIO_PIN_1
+#define B_GPIO_Port GPIOC
+#define C_Pin GPIO_PIN_2
+#define C_GPIO_Port GPIOC
+#define D_Pin GPIO_PIN_3
+#define D_GPIO_Port GPIOC
 #define CLK_Pin GPIO_PIN_4
 #define CLK_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
-#define E_Pin GPIO_PIN_6
-#define E_GPIO_Port GPIOA
-#define D_Pin GPIO_PIN_7
-#define D_GPIO_Port GPIOA
-#define G2_Pin GPIO_PIN_10
-#define G2_GPIO_Port GPIOB
-#define B_Pin GPIO_PIN_7
-#define B_GPIO_Port GPIOC
-#define B2_Pin GPIO_PIN_8
-#define B2_GPIO_Port GPIOA
-#define A_Pin GPIO_PIN_11
-#define A_GPIO_Port GPIOA
-#define R1_Pin GPIO_PIN_12
-#define R1_GPIO_Port GPIOA
-#define G1_Pin GPIO_PIN_3
+#define R1_Pin GPIO_PIN_0
+#define R1_GPIO_Port GPIOB
+#define G1_Pin GPIO_PIN_1
 #define G1_GPIO_Port GPIOB
-#define R2_Pin GPIO_PIN_4
-#define R2_GPIO_Port GPIOB
-#define B1_Pin GPIO_PIN_5
+#define B1_Pin GPIO_PIN_2
 #define B1_GPIO_Port GPIOB
-#define C_Pin GPIO_PIN_6
-#define C_GPIO_Port GPIOB
+#define TMS_Pin GPIO_PIN_13
+#define TMS_GPIO_Port GPIOA
+#define TCK_Pin GPIO_PIN_14
+#define TCK_GPIO_Port GPIOA
+#define R2_Pin GPIO_PIN_3
+#define R2_GPIO_Port GPIOB
+#define G2_Pin GPIO_PIN_4
+#define G2_GPIO_Port GPIOB
+#define B2_Pin GPIO_PIN_5
+#define B2_GPIO_Port GPIOB
 #define OE_Pin GPIO_PIN_8
 #define OE_GPIO_Port GPIOB
 #define LAT_Pin GPIO_PIN_9

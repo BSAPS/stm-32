@@ -19,7 +19,6 @@
 #define IO_REF      1
 #define XOR_OUT     0x0000
 #define MY_ID       4
-
 extern uint8_t rx_byte;
 extern uint8_t rx_buffer[RX_BUFFER_SIZE];
 extern uint16_t rx_index;

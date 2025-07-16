@@ -22,8 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
-#include "led_matrix.h" 
 #include "uart_protocol.h"
+#include "led_matrix.h"
 #include "string.h"
 #include "stdio.h"
 
@@ -52,7 +52,6 @@ UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 
-// LED MATRIX
 uint16_t width = 64;
 uint8_t address_size = 4;
 uint8_t bitDepth = 4;
@@ -74,46 +73,6 @@ static void MX_USART1_UART_Init(void);
 static void MX_TIM10_Init(void);
 /* USER CODE BEGIN PFP */
 
-const char *human32x32[32] = {
-    // ?? 16?
-    ".......111.......",
-    "......11111......",
-    "......11111......",
-    "......11111......",
-    "......11111......",
-    "......11111......",
-    ".......111.......",
-    ".......111.......",
-    "......11111......",
-    ".....1111111.....",
-    ".....1111111.....",
-    ".....1111111.....",
-    "......11111......",
-    ".......111.......",
-    "......1...1......",
-    "......1...1......",
-
-    // ??? 16?
-    "......1...1......",
-    "......1...1......",
-    "......1...1......",
-    ".......1.1.......",
-    ".......1.1.......",
-    ".......1.1.......",
-    ".......111.......",
-    "......11.11......",
-    ".....11...11.....",
-    ".....1.....1.....",
-    ".....1.....1.....",
-    ".....1.....1.....",
-    ".....1.....1.....",
-    ".....1.....1.....",
-    "....11.....11....",
-    "....1.......1...."
-};
-
-uint8_t full_frame[32][64] = {0};  // ?? ?? ??
-
 
 /* USER CODE END PFP */
 
@@ -126,62 +85,6 @@ int fputc(int ch, FILE *f)
     HAL_UART_Transmit(&huart1, temp, 1, 2);
     return ch;
 }
-
-void PatternToFrame(const char *pattern[16], uint16_t *frame) {
-    for (int row = 0; row < 16; row++) {
-        uint16_t bits = 0;
-        for (int col = 0; col < 16; col++) {
-            if (pattern[row][col] == '1') {
-                bits |= (1 << (15 - col));  // ???? MSB? ??
-            }
-        }
-        frame[row] = bits;
-    }
-}
-
-void LEDMatrix_SetFrameFromFullBuffer(uint8_t full[32][64]) {
-    for (int row = 0; row < 16; row++) {
-        uint16_t upper = 0, lower = 0;
-
-        for (int col = 0; col < 32; col++) {
-            if (full[row][col]) {
-                upper |= (1 << (31 - col)); // 0~31 ? bit 31~0
-            }
-            if (full[row + 16][col]) {
-                lower |= (1 << (31 - col)); // 0~31 ? bit 31~0
-            }
-        }
-
-        upper_buffer[row] = upper >> 16; // ?? 16???
-        lower_buffer[row] = lower >> 16;
-    }
-}
-
-
-
-void LEDMatrix_TestRows(void) {
-    for (int row = 0; row < 16; row++) {
-        uint16_t pattern[16] = {0};
-
-        pattern[row] = 0xFFFF;  // ?? ?? ?? ON
-
-        LEDMatrix_SetFrame(pattern, pattern);  // upper/lower ??
-        HAL_Delay(200);  // 0.2? ??
-    }
-}
-
-void LEDMatrix_TestCols(void) {
-    for (int col = 0; col < 16; col++) {
-        uint16_t pattern[16];
-        for (int row = 0; row < 16; row++) {
-            pattern[row] = (1 << (15 - col));  // ??(MSB)?? ???
-        }
-
-        LEDMatrix_SetFrame(pattern, pattern);  // upper/lower ??
-        HAL_Delay(200);  // 0.2? ??
-    }
-}
-
 
 
 /* USER CODE END 0 */
@@ -220,48 +123,13 @@ int main(void)
   /* USER CODE BEGIN 2 */
 	  // TIM10 interrupt start
 	HAL_TIM_Base_Start_IT(&htim10);
-	LEDMatrix_Init();
 	
-	
-	uint8_t full_frame[32][64] = {0};
 
-for (int col = 0; col < 64; col++) {
-    memset(full_frame, 0, sizeof(full_frame));
-    for (int row = 0; row < 32; row++) {
-        full_frame[row][col] = 1;
-    }
-    LEDMatrix_SetFrameFromFullBuffer(full_frame);
-    HAL_Delay(100);
-}
-
-// ??? ???
-for (int row = 0; row < 32; row++) {
-    memset(full_frame, 0, sizeof(full_frame));
-    for (int col = 0; col < 64; col++) {
-        full_frame[row][col] = 1;
-    }
-    LEDMatrix_SetFrameFromFullBuffer(full_frame);
-    HAL_Delay(100);
-}
-	//PatternToUpperLower(human32x32, upper_buffer, lower_buffer);
-	LEDMatrix_SetColor(COLOR_WHITE);
-	LEDMatrix_TurnOn();
-	
-	
 	char *msg = "UART Bitmask FSM Receiver Start\r\n";
 	HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 	HAL_UART_Receive_IT(&huart1, &rx_byte, 1);  // Start interrupt receive
-
-
-
-	LEDColor testColors[] = {
-        COLOR_RED, COLOR_GREEN, COLOR_BLUE,
-        COLOR_YELLOW, COLOR_CYAN, COLOR_MAGENTA, COLOR_WHITE
-    };
-    int numColors = sizeof(testColors) / sizeof(testColors[0]);
-
-    int index = 0;
-    uint32_t lastTick = HAL_GetTick();
+	
+	LEDMatrix_TurnOff(); 
 
   /* USER CODE END 2 */
 
@@ -272,7 +140,7 @@ for (int row = 0; row < 32; row++) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		
+		HUB75_UpdateScreen();
   /* USER CODE END 3 */
 		}
 }
@@ -415,62 +283,61 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, A_Pin|B_Pin|C_Pin|D_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(CLK_GPIO_Port, CLK_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LD2_Pin|E_Pin|D_Pin|B2_Pin
-                          |A_Pin|R1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, G2_Pin|G1_Pin|R2_Pin|B1_Pin
-                          |C_Pin|LAT_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(B_GPIO_Port, B_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, R1_Pin|G1_Pin|B1_Pin|R2_Pin
+                          |G2_Pin|B2_Pin|LAT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(OE_GPIO_Port, OE_Pin, GPIO_PIN_SET);
 
-  /*Configure GPIO pins : CLK_Pin E_Pin D_Pin B2_Pin
-                           A_Pin */
-  GPIO_InitStruct.Pin = CLK_Pin|E_Pin|D_Pin|B2_Pin
-                          |A_Pin;
+  /*Configure GPIO pins : A_Pin B_Pin C_Pin D_Pin */
+  GPIO_InitStruct.Pin = A_Pin|B_Pin|C_Pin|D_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD2_Pin R1_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin|R1_Pin;
+  /*Configure GPIO pin : CLK_Pin */
+  GPIO_InitStruct.Pin = CLK_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(CLK_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : G2_Pin C_Pin OE_Pin LAT_Pin */
-  GPIO_InitStruct.Pin = G2_Pin|C_Pin|OE_Pin|LAT_Pin;
+  /*Configure GPIO pins : R1_Pin G1_Pin B1_Pin R2_Pin
+                           G2_Pin B2_Pin */
+  GPIO_InitStruct.Pin = R1_Pin|G1_Pin|B1_Pin|R2_Pin
+                          |G2_Pin|B2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : B_Pin */
-  GPIO_InitStruct.Pin = B_Pin;
+  /*Configure GPIO pins : OE_Pin LAT_Pin */
+  GPIO_InitStruct.Pin = OE_Pin|LAT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(B_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : G1_Pin R2_Pin B1_Pin */
-  GPIO_InitStruct.Pin = G1_Pin|R2_Pin|B1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
