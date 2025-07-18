@@ -129,8 +129,16 @@ int main(void)
 	HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 	HAL_UART_Receive_IT(&huart1, &rx_byte, 1);  // Start interrupt receive
 	
-	LEDMatrix_TurnOff(); 
-
+	//LEDMatrix_TurnOff(); 
+	//HAL_Delay(1000);
+	
+	
+	//LEDMatrix_TurnOn(); 
+	//HAL_Delay(2000);
+	
+	//LEDMatrix_TurnOff(); 
+	//HAL_Delay(1000);
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */

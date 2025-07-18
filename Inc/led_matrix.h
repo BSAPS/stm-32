@@ -45,7 +45,8 @@ void HUB75_UpdateScreen(void);
 // === power on/off ===
 void LEDMatrix_TurnOn(void);
 void LEDMatrix_TurnOff(void);
-
+void drawStopNow(void);
+void drawGo(void);
 #ifdef __cplusplus
 }
 #endif
