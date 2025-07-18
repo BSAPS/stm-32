@@ -1,0 +1,256 @@
+/* Includes ------------------------------------------------------------------*/
+#include "led_matrix.h"
+#include "main.h"
+
+#define HIGH GPIO_PIN_SET
+#define LOW  GPIO_PIN_RESET
+#define HUB75_WIDTH   64
+#define HUB75_HEIGHT  32
+#define FONT_WIDTH  14
+#define FONT_HEIGHT 16
+//#define FONT_WIDTH_3B 17
+//#define FONT_HEIGHT_3B 24
+
+/* ------------------- 프레임 버퍼 ------------------- */
+uint8_t rgb_framebuffer[HUB75_HEIGHT][HUB75_WIDTH][3] = {0};  // [row][col][RGB]
+
+/* ----=== GPIO pin mapping ===--------- */
+HUB75_Pins mat_pins = {
+    .R1  = {GPIOB, GPIO_PIN_0},
+    .G1  = {GPIOB, GPIO_PIN_1},
+    .B1  = {GPIOB, GPIO_PIN_2},
+    .R2  = {GPIOB, GPIO_PIN_3},  // 추가 정의 필요
+    .G2  = {GPIOB, GPIO_PIN_4},
+    .B2  = {GPIOB, GPIO_PIN_5},
+    .CLK = {GPIOA, GPIO_PIN_4},
+    .LAT = {GPIOB, GPIO_PIN_9},
+    .OE  = {GPIOB, GPIO_PIN_8},
+    .A   = {GPIOC, GPIO_PIN_0},
+    .B   = {GPIOC, GPIO_PIN_1},
+    .C   = {GPIOC, GPIO_PIN_2},
+    .D   = {GPIOC, GPIO_PIN_3},
+};
+
+
+// ==== STOP NOW ! ==== (Pixel M)
+
+const uint8_t bitmap_S[FONT_HEIGHT][2] = {
+    {0x00,0x00}, {0x00,0x00}, {0x0F,0xB0}, {0x1F,0xF0},
+    {0x38,0x70}, {0x30,0x30}, {0x38,0x00}, {0x1F,0x80},
+    {0x07,0xE0}, {0x00,0x70}, {0x30,0x30}, {0x38,0x70},
+    {0x3F,0xE0}, {0x37,0xC0}, {0x00,0x00}, {0x00,0x00}
+};
+
+const uint8_t bitmap_T[FONT_HEIGHT][2] = {
+    {0x00,0x00}, {0x00,0x00}, {0x3F,0xF0}, {0x3F,0xF0},
+    {0x33,0x30}, {0x33,0x30}, {0x33,0x30}, {0x03,0x00},
+    {0x03,0x00}, {0x03,0x00}, {0x03,0x00}, {0x03,0x00},
+    {0x0F,0xC0}, {0x0F,0xC0}, {0x00,0x00}, {0x00,0x00}
+};
+
+const uint8_t bitmap_O[FONT_HEIGHT][2] = {
+    {0x00,0x00}, {0x00,0x00}, {0x07,0x80}, {0x0F,0xC0},
+    {0x1C,0xE0}, {0x38,0x70}, {0x30,0x30}, {0x30,0x30},
+    {0x30,0x30}, {0x30,0x30}, {0x38,0x70}, {0x1C,0xE0},
+    {0x0F,0xC0}, {0x07,0x80}, {0x00,0x00}, {0x00,0x00}
+};
+
+const uint8_t bitmap_P[FONT_HEIGHT][2] = {
+    {0x00,0x00}, {0x00,0x00}, {0x3F,0xC0}, {0x3F,0xE0},
+    {0x18,0x70}, {0x18,0x30}, {0x18,0x30}, {0x18,0x70},
+    {0x1F,0xE0}, {0x1F,0xC0}, {0x18,0x00}, {0x18,0x00},
+    {0x3F,0x00}, {0x3F,0x00}, {0x00,0x00}, {0x00,0x00}
+};
+
+const uint8_t bitmap_N[FONT_HEIGHT][2] = {
+    {0x00,0x00}, {0x00,0x00}, {0x39,0xF0}, {0x3D,0xF0},
+    {0x1C,0x60}, {0x1E,0x60}, {0x1E,0x60}, {0x1B,0x60},
+    {0x1B,0x60}, {0x19,0xE0}, {0x19,0xE0}, {0x18,0xE0},
+    {0x3E,0xE0}, {0x3E,0x60}, {0x00,0x00}, {0x00,0x00}
+};
+
+const uint8_t bitmap_W[FONT_HEIGHT][2] = {
+    {0x00,0x00}, {0x00,0x00}, {0x7C,0x7C}, {0x7C,0x7C},
+    {0x30,0x18}, {0x33,0x98}, {0x33,0x98}, {0x33,0x98},
+    {0x36,0xD8}, {0x16,0xD0}, {0x1C,0x70}, {0x1C,0x70},
+    {0x1C,0x70}, {0x18,0x30}, {0x00,0x00}, {0x00,0x00}
+};
+
+const uint8_t bitmap_EXCL[FONT_HEIGHT][2] = {
+    {0x00,0x00}, {0x07,0x00}, {0x07,0x00}, {0x07,0x00},
+    {0x07,0x00}, {0x07,0x00}, {0x07,0x00}, {0x07,0x00},
+    {0x02,0x00}, {0x02,0x00}, {0x00,0x00}, {0x00,0x00},
+    {0x07,0x00}, {0x07,0x00}, {0x00,0x00}, {0x00,0x00}
+};
+
+//GO! (Pixel L)
+const uint8_t G_bitmap[24][3] = {
+    {0x00,0x00,0x00},{0x00,0x00,0x00},{0x00,0x00,0x00},
+    {0x03,0xEC,0x00},{0x0F,0xFC,0x00},{0x1C,0x1C,0x00},
+    {0x18,0x0C,0x00},{0x30,0x0C,0x00},{0x30,0x00,0x00},
+    {0x30,0x00,0x00},{0x30,0xFE,0x00},{0x30,0xFE,0x00},
+    {0x30,0x0C,0x00},{0x38,0x0C,0x00},{0x1C,0x1C,0x00},
+    {0x0F,0xFC,0x00},{0x03,0xF0,0x00},{0x00,0x00,0x00},
+    {0x00,0x00,0x00},{0x00,0x00,0x00},{0x00,0x00,0x00},
+    {0x00,0x00,0x00},{0x00,0x00,0x00},{0x00,0x00,0x00}
+};
+
+const uint8_t O_bitmap[24][3] = {
+    {0x00,0x00,0x00},{0x00,0x00,0x00},{0x00,0x00,0x00},
+    {0x03,0xC0,0x00},{0x0F,0xF0,0x00},{0x1C,0x38,0x00},
+    {0x18,0x18,0x00},{0x38,0x1C,0x00},{0x30,0x0C,0x00},
+    {0x30,0x0C,0x00},{0x30,0x0C,0x00},{0x30,0x0C,0x00},
+    {0x38,0x1C,0x00},{0x18,0x18,0x00},{0x1C,0x38,0x00},
+    {0x0F,0xF0,0x00},{0x03,0xC0,0x00},{0x00,0x00,0x00},
+    {0x00,0x00,0x00},{0x00,0x00,0x00},{0x00,0x00,0x00},
+    {0x00,0x00,0x00},{0x00,0x00,0x00},{0x00,0x00,0x00}
+};
+
+const uint8_t EXCL_bitmap[24][3] = {
+    {0x00,0x00,0x00},{0x00,0x00,0x00},{0x03,0x80,0x00},
+    {0x03,0x80,0x00},{0x03,0x80,0x00},{0x03,0x80,0x00},
+    {0x03,0x80,0x00},{0x03,0x80,0x00},{0x03,0x80,0x00},
+    {0x03,0x80,0x00},{0x03,0x80,0x00},{0x03,0x80,0x00},
+    {0x01,0x00,0x00},{0x01,0x00,0x00},{0x00,0x00,0x00},
+    {0x00,0x00,0x00},{0x03,0x80,0x00},{0x03,0x80,0x00},
+    {0x00,0x00,0x00},{0x00,0x00,0x00},{0x00,0x00,0x00},
+    {0x00,0x00,0x00},{0x00,0x00,0x00},{0x00,0x00,0x00}
+};
+
+
+/* USER CODE END PV */
+
+/* USER CODE BEGIN PFP */
+/* ------------------- 유틸리티 함수 ------------------- */
+void pulse(GPIO_TypeDef* port, uint16_t pin) {
+    HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET);
+}
+
+void set_row_address(uint8_t row) {
+    HAL_GPIO_WritePin(mat_pins.A.port, mat_pins.A.pin, (row >> 0) & 0x01);
+    HAL_GPIO_WritePin(mat_pins.B.port, mat_pins.B.pin, (row >> 1) & 0x01);
+    HAL_GPIO_WritePin(mat_pins.C.port, mat_pins.C.pin, (row >> 2) & 0x01);
+    HAL_GPIO_WritePin(mat_pins.D.port, mat_pins.D.pin, (row >> 3) & 0x01);
+}
+
+void setPixel(uint8_t row, uint8_t col, uint8_t r, uint8_t g, uint8_t b) {
+    if (row < HUB75_HEIGHT && col < HUB75_WIDTH) {
+        rgb_framebuffer[row][col][0] = r;
+        rgb_framebuffer[row][col][1] = g;
+        rgb_framebuffer[row][col][2] = b;
+    }
+}
+
+void clearBuffer(void) {
+    memset(rgb_framebuffer, 0, sizeof(rgb_framebuffer));
+}
+
+/* ------------------- 화면 갱신 ------------------- */
+void HUB75_UpdateScreen(void) {
+    for (uint8_t row = 0; row < HUB75_HEIGHT / 2; row++) {
+        set_row_address(row);
+
+        HAL_GPIO_WritePin(mat_pins.OE.port, mat_pins.OE.pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(mat_pins.LAT.port, mat_pins.LAT.pin, GPIO_PIN_RESET);
+
+        for (uint8_t col = 0; col < HUB75_WIDTH; col++) {
+            uint8_t r1 = rgb_framebuffer[row][col][0];
+            uint8_t g1 = rgb_framebuffer[row][col][1];
+            uint8_t b1 = rgb_framebuffer[row][col][2];
+            uint8_t r2 = rgb_framebuffer[row + HUB75_HEIGHT / 2][col][0];
+            uint8_t g2 = rgb_framebuffer[row + HUB75_HEIGHT / 2][col][1];
+            uint8_t b2 = rgb_framebuffer[row + HUB75_HEIGHT / 2][col][2];
+
+            HAL_GPIO_WritePin(mat_pins.R1.port, mat_pins.R1.pin, r1);
+            HAL_GPIO_WritePin(mat_pins.G1.port, mat_pins.G1.pin, g1);
+            HAL_GPIO_WritePin(mat_pins.B1.port, mat_pins.B1.pin, b1);
+            HAL_GPIO_WritePin(mat_pins.R2.port, mat_pins.R2.pin, r2);
+            HAL_GPIO_WritePin(mat_pins.G2.port, mat_pins.G2.pin, g2);
+            HAL_GPIO_WritePin(mat_pins.B2.port, mat_pins.B2.pin, b2);
+
+            pulse(mat_pins.CLK.port, mat_pins.CLK.pin);
+        }
+
+        pulse(mat_pins.LAT.port, mat_pins.LAT.pin);
+        HAL_GPIO_WritePin(mat_pins.OE.port, mat_pins.OE.pin, GPIO_PIN_RESET);
+
+        HAL_Delay(1);  // 간단한 프레임 유지 시간
+    }
+}
+
+void LEDMatrix_TurnOn(void) {
+    clearBuffer();
+
+    drawStopNow();
+}
+
+void LEDMatrix_TurnOff(void) {
+    clearBuffer();
+		//drawGo();
+}
+
+
+
+
+void drawCharBitmap(uint8_t row, uint8_t col, const uint8_t bitmap[][2]) {
+    for (uint8_t r = 0; r < FONT_HEIGHT; r++) {
+        for (uint8_t c = 0; c < FONT_WIDTH; c++) {
+            uint8_t byte_index = c / 8;
+            uint8_t bit_index = 7 - (c % 8);
+            if (bitmap[r][byte_index] & (1 << bit_index)) {
+                setPixel(row + r, col + c, 1, 0, 0);  // 빨간색
+            }
+        }
+    }
+}
+
+//GO! Bitmap
+void drawCharBitmap3B(uint8_t row, uint8_t col, const uint8_t bitmap[][3]) {
+    for (uint8_t r = 0; r < 24; r++) {
+        uint32_t rowBits = (bitmap[r][0] << 16) | (bitmap[r][1] << 8) | bitmap[r][2];
+        for (uint8_t c = 0; c < 17; c++) {
+            if (rowBits & (1 << (23 - c))) {
+                setPixel(row + r, col + c, 0, 1, 0);  // green
+            }
+        }
+    }
+}
+
+
+// ==== 메시지 표시 ====
+void drawStopNow(void) {
+    clearBuffer();
+
+    uint8_t row1 = 0;
+    uint8_t row2 = 16;
+    uint8_t spacing = 2;
+    uint8_t charWidth = FONT_WIDTH;
+    uint8_t totalWidth = charWidth * 4 + spacing * 3; // 56
+    uint8_t startCol = (HUB75_WIDTH - totalWidth) / 2;  // 4
+
+    // Line 1: S T O P
+    drawCharBitmap(row1, startCol + (charWidth + spacing) * 0, bitmap_S);
+    drawCharBitmap(row1, startCol + (charWidth + spacing) * 1, bitmap_T);
+    drawCharBitmap(row1, startCol + (charWidth + spacing) * 2, bitmap_O);
+    drawCharBitmap(row1, startCol + (charWidth + spacing) * 3, bitmap_P);
+
+    // Line 2:   N O W !
+    drawCharBitmap(row2, startCol + (charWidth + spacing) * 0, bitmap_N);
+    drawCharBitmap(row2, startCol + (charWidth + spacing) * 1, bitmap_O);
+    drawCharBitmap(row2, startCol + (charWidth + spacing) * 2, bitmap_W);
+    drawCharBitmap(row2, startCol + (charWidth + spacing) * 3, bitmap_EXCL);
+}
+
+void drawGo(void) {
+    clearBuffer();
+
+    int total_width = 17 * 3 + 1 * 2;  // 문자 3개 + 간격
+    int start_col = (64 - total_width) / 2;
+    int start_row = 4;
+
+    drawCharBitmap3B(start_row, 5, G_bitmap);          // G
+    drawCharBitmap3B(start_row, 22, O_bitmap);     // O
+    drawCharBitmap3B(start_row, 39, EXCL_bitmap); // !
+}
+
