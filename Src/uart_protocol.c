@@ -2,19 +2,27 @@
 
 #include "uart_protocol.h"
 #include "led_matrix.h"
+#include "led_font.h"
 #include "string.h"
 #include "stdio.h"
+
+
+extern UART_HandleTypeDef huart1;
+extern RTC_HandleTypeDef hrtc;
+extern uint8_t rx_byte;
+extern uint8_t led_enabled;
 
 uint8_t rx_byte = 0;
 uint16_t rx_index = 0;
 uint8_t rx_buffer[RX_BUFFER_SIZE] = {0};
 
 
+
 // Callback function triggered when a UART byte is received (Interrupt)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if (huart->Instance == USART1) {
         FSM_ParseByte(rx_byte);
-        HAL_UART_Receive_IT(&huart1, &rx_byte, 1);  // Continue receiving next byte
+       HAL_UART_Receive_IT(&huart1, &rx_byte, 1);  // Continue receiving next byte
     }
 }
 
@@ -31,19 +39,12 @@ unsigned short reverse_value(unsigned short value, int bit) {
 unsigned short crc16_calc(uint8_t *pData, int length) {
     unsigned short crc = 0x0000;
     while (length--) {
-        if (IO_REF == 0)
-            crc ^= *(unsigned char *)pData++ << 8;
-        else
-            crc ^= reverse_value(*pData++, 8) << 8;
-
+        crc ^= reverse_value(*pData++, 8) << 8;
         for (int i = 0; i < 8; i++) {
-            crc = crc & 0x8000 ? (crc << 1) ^ 0x8005 : crc << 1;
+            crc = (crc & 0x8000) ? (crc << 1) ^ 0x8005 : crc << 1;
         }
     }
-
-    if (IO_REF == 1)
-        crc = reverse_value(crc, 16);
-
+    crc = reverse_value(crc, 16);
     return crc ^ 0x0000;
 }
 
@@ -107,57 +108,64 @@ void FSM_ParseByte(uint8_t rx) {
 
 // Process a fully received command frame
 void ProcessCommand(uint8_t *data, uint16_t len) {
-    if (len < 4) {
-        char *msg = "Invalid Frame Length\r\n";
-        HAL_UART_Transmit(&huart1, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
-        return;
-    }
+    if (len < 4) return;
 
     uint8_t dst_mask = data[0];
     uint8_t cmd = data[1];
-    uint16_t recv_crc = (data[2] << 8) | data[3];
-    uint16_t calc_crc = crc16_calc(&data[0], 2);
 
+    // payload: data[2] ~ data[len - 3]
+    uint16_t payload_len = len - 4;
+    uint8_t* payload = &data[2];
+
+    uint16_t recv_crc = (data[len - 2] << 8) | data[len - 1];
+    uint16_t calc_crc = crc16_calc(data, len - 2);
     if (recv_crc != calc_crc) {
-        char *msg = "CRC Error\r\n";
-        HAL_UART_Transmit(&huart1, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
-        UART_SendFrame(CMD_NACK); // Send NACK if CRC fails
+        UART_SendFrame(CMD_NACK);
         return;
     }
 
-    if ((dst_mask >> (MY_ID - 1)) & 0x01) {
-        switch (cmd) {
-            case CMD_LCD_ON:
-                HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-                LEDMatrix_TurnOn();
-                {
-                    char msg[64];
-                    snprintf(msg, sizeof(msg), "[Board %d] LD2 ON\r\n", MY_ID);
-                    HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 50);
-                    UART_SendFrame(CMD_ACK);
-                }
-                break;
-            case CMD_LCD_OFF:
-                HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-                LEDMatrix_TurnOff();
-                {
-                    char msg[64];
-                    snprintf(msg, sizeof(msg), "[Board %d] LD2 OFF\r\n", MY_ID);
-                    HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 50);
-                    UART_SendFrame(CMD_ACK);
-                }
-                break;
-            default:
-                {
-                    char msg[64];
-                    snprintf(msg, sizeof(msg), "[Board %d] Unknown CMD\r\n", MY_ID);
-                    HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 50);
-                }
-                break;
-        }
-    } else {
-        char msg[64];
-        snprintf(msg, sizeof(msg), "[Board %d] Ignored Frame\r\n", MY_ID);
-        HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), 50);
+    if (((dst_mask >> (MY_ID - 1)) & 0x01) == 0) return;
+
+    switch (cmd) {
+        case CMD_LCD_ON:
+            led_enabled = 1;
+            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+            LEDMatrix_TurnOn();
+            UART_SendFrame(CMD_ACK);
+            break;
+
+        case CMD_LCD_OFF:
+            led_enabled = 0;
+            HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+            LEDMatrix_TurnOff();
+            UART_SendFrame(CMD_ACK);
+            break;
+
+        case CMD_SYNC_TIME:
+            if (payload_len == 7) {
+                RTC_TimeTypeDef newTime;
+                RTC_DateTypeDef newDate;
+
+                newDate.Year  = payload[0];
+                newDate.Month = payload[1];
+                newDate.Date  = payload[2];
+                newDate.WeekDay = RTC_WEEKDAY_MONDAY;
+
+                newTime.Hours   = payload[3];
+                newTime.Minutes = payload[4];
+                newTime.Seconds = payload[5];
+                newTime.TimeFormat = payload[6] ? RTC_HOURFORMAT12_PM : RTC_HOURFORMAT12_AM;
+                newTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+                newTime.StoreOperation = RTC_STOREOPERATION_RESET;
+
+                HAL_RTC_SetTime(&hrtc, &newTime, RTC_FORMAT_BIN);
+                HAL_RTC_SetDate(&hrtc, &newDate, RTC_FORMAT_BIN);
+                UART_SendFrame(CMD_ACK);
+            }
+            break;
+
+        default:
+            UART_SendFrame(CMD_NACK);
+            break;
     }
 }
