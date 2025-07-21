@@ -12,6 +12,7 @@
 #define CMD_NACK   0x55
 #define CMD_LCD_ON  0x01
 #define CMD_LCD_OFF 0x02
+#define CMD_SYNC_TIME 0x03
 
 #define RX_BUFFER_SIZE 256
 #define CRC_INIT    0x0000

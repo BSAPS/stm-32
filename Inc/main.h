@@ -31,7 +31,9 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "led_font.h"
+#include "led_matrix.h"
+#include "uart_protocol.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
