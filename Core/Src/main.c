@@ -22,7 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
-
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,22 +43,21 @@
 /* Private variables ---------------------------------------------------------*/
 RTC_HandleTypeDef hrtc;
 
-TIM_HandleTypeDef htim3;
-DMA_HandleTypeDef hdma_tim3_ch4_up;
+TIM_HandleTypeDef htim10;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
 uint8_t led_enabled = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_RTC_Init(void);
-static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM10_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -97,79 +96,72 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_RTC_Init();
-  MX_TIM3_Init();
   MX_USART1_UART_Init();
+  MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
-//  // 픽셀 테스트
-//      clearBuffer();  // 프레임 버퍼 초기화
-//
-//      // 초록색 픽셀 찍기
-//      setPixel(4, 12, 1, 0, 0);   // (12, 4)
-//      setPixel(17, 24, 1, 1, 0);  // (24, 17)
 
-	char *msg = "UART Bitmask FSM Receiver Start\r\n";
-	HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-	HAL_UART_Receive_IT(&huart1, &rx_byte, 1);  // Start interrupt receive
+  char *msg = "UART Bitmask FSM Receiver Start\r\n";
+  HAL_UART_Transmit(&huart1, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+  HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
 
-
-  //HAL_UART_Receive_IT(&huart1, &rx_byte,1);
-  //drawGo();
-  //HUB75_UpdateScreen();
-  //HAL_Delay(2000);  // 2초 보여주기
-//	clearBuffer();
-
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
   RTC_TimeTypeDef sTime;
   RTC_DateTypeDef sDate;
   char temp[100];
   const char* ampm;
 
-  uint8_t last_minute = 0xFF;  // 초기값: 무조건 첫 프레임 표시
+  uint8_t last_minute = 0xFF;
   uint32_t last_tick = 0;
 
+  HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+  ampm = (sTime.TimeFormat == RTC_HOURFORMAT12_AM) ? "AM" : "PM";
 
-  while (1)
+  clearBuffer();
+  drawClockTime(sTime.Hours, sTime.Minutes, ampm);
+
+
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+
+    while (1)
   {
-
-
+	  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // 보통 Nucleo-F401RE의 LD2
+	  	///  HAL_Delay(500);
+	  	HUB75_UpdateScreen();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  	if (HAL_GetTick() - last_tick >= 1000) {
+	  			last_tick = HAL_GetTick();
 
-	HUB75_UpdateScreen();
-	if (HAL_GetTick() - last_tick >= 1000) {
-		last_tick = HAL_GetTick();
+	  			HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+	  			HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 
-		HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-		HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+	  			const char* ampm = (sTime.TimeFormat == RTC_HOURFORMAT12_AM) ? "AM" : "PM";
 
-		const char* ampm = (sTime.TimeFormat == RTC_HOURFORMAT12_AM) ? "AM" : "PM";
+	  			if (sTime.Minutes != last_minute) {
+	  				last_minute = sTime.Minutes;
 
-		if (sTime.Minutes != last_minute) {
-			last_minute = sTime.Minutes;
+	  				clearBuffer();
+	  				if (led_enabled) {
+	  					drawStopNow();  // ON 상태일 때 STOP NOW 메시지
+	  				} else {
+	  					drawClockTime(sTime.Hours, sTime.Minutes, ampm);  // OFF 상태에서도 시계는 표시
+	  				}
+	  			}
 
-			clearBuffer();
-			if (led_enabled) {
-				drawStopNow();  // ON 상태일 때 STOP NOW 메시지
-			} else {
-				RTC_HandleTypeDef hrtc;
-				drawClockTime(sTime.Hours, sTime.Minutes, ampm);  // OFF 상태에서도 시계는 표시
-			}
-		}
+	  			sprintf(temp, "\r\n20%02x-%02x-%02x %s %02x:%02x:%02x",
+	  					sDate.Year, sDate.Month, sDate.Date,
+	  					ampm, sTime.Hours, sTime.Minutes, sTime.Seconds);
+	  			HAL_UART_Transmit(&huart1, (uint8_t*)temp, strlen(temp), HAL_MAX_DELAY);
+	  		}
 
-		sprintf(temp, "\r\n20%02x-%02x-%02x %s %02x:%02x:%02x",
-				sDate.Year, sDate.Month, sDate.Date,
-				ampm, sTime.Hours, sTime.Minutes, sTime.Seconds);
-		HAL_UART_Transmit(&huart1, (uint8_t*)temp, strlen(temp), HAL_MAX_DELAY);
-	}
 
-  /* USER CODE END 3 */
   }
+  /* USER CODE END 3 */
 }
 
 /**
@@ -189,10 +181,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
-  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 16;
@@ -284,47 +276,47 @@ static void MX_RTC_Init(void)
 }
 
 /**
-  * @brief TIM3 Initialization Function
+  * @brief TIM10 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM3_Init(void)
+static void MX_TIM10_Init(void)
 {
 
-  /* USER CODE BEGIN TIM3_Init 0 */
+  /* USER CODE BEGIN TIM10_Init 0 */
 
-  /* USER CODE END TIM3_Init 0 */
+  /* USER CODE END TIM10_Init 0 */
 
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
-  /* USER CODE BEGIN TIM3_Init 1 */
+  /* USER CODE BEGIN TIM10_Init 1 */
 
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 83;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 99;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  /* USER CODE END TIM10_Init 1 */
+  htim10.Instance = TIM10;
+  htim10.Init.Prescaler = 8399;
+  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim10.Init.Period = 99;
+  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
     Error_Handler();
   }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  if (HAL_TIM_OC_Init(&htim10) != HAL_OK)
   {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  sConfigOC.OCMode = TIM_OCMODE_TIMING;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_OC_ConfigChannel(&htim10, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM3_Init 2 */
+  /* USER CODE BEGIN TIM10_Init 2 */
 
-  /* USER CODE END TIM3_Init 2 */
+  /* USER CODE END TIM10_Init 2 */
 
 }
 
@@ -362,22 +354,6 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Stream2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -399,10 +375,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, A_Pin|B_Pin|C_Pin|D_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CLK_GPIO_Port, CLK_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, CLK_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, R1_Pin|G1_Pin|B1_Pin|R2_Pin
@@ -418,10 +391,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : USART_TX_Pin USART_RX_Pin */
+  GPIO_InitStruct.Pin = USART_TX_Pin|USART_RX_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pin : CLK_Pin */
   GPIO_InitStruct.Pin = CLK_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(CLK_GPIO_Port, &GPIO_InitStruct);
 
@@ -438,7 +419,7 @@ static void MX_GPIO_Init(void)
                           |G2_Pin|B2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : OE_Pin LAT_Pin */
@@ -471,8 +452,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.

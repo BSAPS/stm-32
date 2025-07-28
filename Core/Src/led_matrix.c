@@ -165,12 +165,12 @@ void HUB75_UpdateScreen(void) {
             uint8_t g2 = rgb_framebuffer[row + HUB75_HEIGHT / 2][col][1];
             uint8_t b2 = rgb_framebuffer[row + HUB75_HEIGHT / 2][col][2];
 
-            HAL_GPIO_WritePin(mat_pins.R1.port, mat_pins.R1.pin, r1);
-            HAL_GPIO_WritePin(mat_pins.G1.port, mat_pins.G1.pin, g1);
-            HAL_GPIO_WritePin(mat_pins.B1.port, mat_pins.B1.pin, b1);
-            HAL_GPIO_WritePin(mat_pins.R2.port, mat_pins.R2.pin, r2);
-            HAL_GPIO_WritePin(mat_pins.G2.port, mat_pins.G2.pin, g2);
-            HAL_GPIO_WritePin(mat_pins.B2.port, mat_pins.B2.pin, b2);
+            HAL_GPIO_WritePin(mat_pins.R1.port, mat_pins.R1.pin, r1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(mat_pins.G1.port, mat_pins.G1.pin, g1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(mat_pins.B1.port, mat_pins.B1.pin, b1 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(mat_pins.R2.port, mat_pins.R2.pin, r2 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(mat_pins.G2.port, mat_pins.G2.pin, g2 ? GPIO_PIN_SET : GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(mat_pins.B2.port, mat_pins.B2.pin, b2 ? GPIO_PIN_SET : GPIO_PIN_RESET);
 
             pulse(mat_pins.CLK.port, mat_pins.CLK.pin);
         }
@@ -178,9 +178,10 @@ void HUB75_UpdateScreen(void) {
         pulse(mat_pins.LAT.port, mat_pins.LAT.pin);
         HAL_GPIO_WritePin(mat_pins.OE.port, mat_pins.OE.pin, GPIO_PIN_RESET);
 
-        HAL_Delay(1);  // 간단한 프레임 유지 시간
+        HAL_Delay(0.1);
     }
 }
+
 
 void LEDMatrix_TurnOn(void) {
     clearBuffer();
@@ -333,4 +334,3 @@ void drawGo(void) {
     drawCharBitmap3B(start_row, start_col + (17 + spacing) * 1, O_bitmap);     // O
     drawCharBitmap3B(start_row, start_col + (17 + spacing) * 2, EXCL_bitmap); // !
 }
-

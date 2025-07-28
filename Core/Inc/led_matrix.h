@@ -44,6 +44,7 @@ void setPixel(uint8_t row, uint8_t col, uint8_t r, uint8_t g, uint8_t b);
 void clearBuffer(void);
 void HUB75_UpdateScreen(void);
 
+
 void drawDigit(uint8_t digit, int y, int x);
 void drawClockTime(uint8_t hour, uint8_t minute, const char* ampm);
 // === power on/off ===
