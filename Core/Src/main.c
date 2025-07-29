@@ -130,35 +130,32 @@ int main(void)
   {
 	  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // 보통 Nucleo-F401RE의 LD2
 	  	///  HAL_Delay(500);
-	  	HUB75_UpdateScreen();
+	HUB75_UpdateScreen();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  	if (HAL_GetTick() - last_tick >= 1000) {
-	  			last_tick = HAL_GetTick();
 
-	  			HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-	  			HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+	HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+	ampm = (sTime.TimeFormat == RTC_HOURFORMAT12_AM) ? "AM" : "PM";
 
-	  			const char* ampm = (sTime.TimeFormat == RTC_HOURFORMAT12_AM) ? "AM" : "PM";
+	// 1분마다 시계 정보 UART 출력
+	if (sTime.Minutes != last_minute) {
+		last_minute = sTime.Minutes;
 
-	  			if (sTime.Minutes != last_minute) {
-	  				last_minute = sTime.Minutes;
+		sprintf(temp, "\r\n20%02x-%02x-%02x %s %02x:%02x:%02x",
+			sDate.Year, sDate.Month, sDate.Date,
+			ampm, sTime.Hours, sTime.Minutes, sTime.Seconds);
+		HAL_UART_Transmit(&huart1, (uint8_t*)temp, strlen(temp), HAL_MAX_DELAY);
+	}
 
-	  				clearBuffer();
-	  				if (led_enabled) {
-	  					drawStopNow();  // ON 상태일 때 STOP NOW 메시지
-	  				} else {
-	  					drawClockTime(sTime.Hours, sTime.Minutes, ampm);  // OFF 상태에서도 시계는 표시
-	  				}
-	  			}
-
-	  			sprintf(temp, "\r\n20%02x-%02x-%02x %s %02x:%02x:%02x",
-	  					sDate.Year, sDate.Month, sDate.Date,
-	  					ampm, sTime.Hours, sTime.Minutes, sTime.Seconds);
-	  			HAL_UART_Transmit(&huart1, (uint8_t*)temp, strlen(temp), HAL_MAX_DELAY);
-	  		}
-
+	// 상태에 따라 표시 전환
+	if (led_enabled) {
+		LEDMatrix_TurnOn();  // 내부에서 1초마다 stop/mario 토글
+	} else {
+		clearBuffer();
+		drawClockTime(sTime.Hours, sTime.Minutes, ampm);
+	}
 
   }
   /* USER CODE END 3 */

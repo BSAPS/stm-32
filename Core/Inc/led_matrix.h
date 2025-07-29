@@ -51,6 +51,7 @@ void drawClockTime(uint8_t hour, uint8_t minute, const char* ampm);
 void LEDMatrix_TurnOn(void);
 void LEDMatrix_TurnOff(void);
 void drawStopNow(void);
+void drawMario(uint8_t start_row, uint8_t start_col);
 void drawGo(void);
 #ifdef __cplusplus
 }

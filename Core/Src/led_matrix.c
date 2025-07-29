@@ -13,6 +13,7 @@
 //#define FONT_HEIGHT_3B 24
 
 extern RTC_HandleTypeDef hrtc;
+extern uint8_t led_enabled;
 
 /* ------------------- 프레임 버퍼 ------------------- */
 uint8_t rgb_framebuffer[HUB75_HEIGHT][HUB75_WIDTH][3] = {0};  // [row][col][RGB]
@@ -184,9 +185,22 @@ void HUB75_UpdateScreen(void) {
 
 
 void LEDMatrix_TurnOn(void) {
-    clearBuffer();
+    static uint32_t last_tick = 0;
+    static int state = 0;
 
-    drawStopNow();
+    if (!led_enabled) return;
+
+    uint32_t now = HAL_GetTick();
+    if (now - last_tick < 1000) return;
+    last_tick = now;
+
+    clearBuffer();
+    if (state == 0) {
+        drawStopNow();
+    } else {
+        drawMario(0, 16);
+    }
+    state = 1 - state;
 }
 
 void LEDMatrix_TurnOff(void) {
@@ -334,3 +348,26 @@ void drawGo(void) {
     drawCharBitmap3B(start_row, start_col + (17 + spacing) * 1, O_bitmap);     // O
     drawCharBitmap3B(start_row, start_col + (17 + spacing) * 2, EXCL_bitmap); // !
 }
+
+
+void drawMario(uint8_t start_row, uint8_t start_col) {
+    for (uint8_t r = 0; r < 32; r++) {
+        for (uint8_t c = 0; c < 32; c++) {
+            uint8_t color = marioBits[r][c];
+
+            uint8_t red = 0, green = 0, blue = 0;
+
+            switch (color) {
+                case 0x00: red = 0; green = 0; blue = 0; break;  // 검정
+                case 0x01: red = 0; green = 0; blue = 1; break;  // 파랑
+                case 0x04: red = 1; green = 0; blue = 0; break;  // 빨강
+                case 0x06: red = 1; green = 1; blue = 0; break;  // 노랑
+                case 0x07: red = 1; green = 1; blue = 1; break;  // 흰색
+                default:   red = 0; green = 0; blue = 0; break;  // 예외: 검정 처리
+            }
+
+            setPixel(start_row + r, start_col + c, red, green, blue);
+        }
+    }
+}
+

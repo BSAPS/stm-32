@@ -20,7 +20,7 @@ extern const uint8_t big_bitmap_7[BIG_FONT_HEIGHT][2];
 extern const uint8_t big_bitmap_8[BIG_FONT_HEIGHT][2];
 extern const uint8_t big_bitmap_9[BIG_FONT_HEIGHT][2];
 extern const uint8_t big_bitmap_COLON[BIG_FONT_HEIGHT][2];
-
+extern const uint8_t marioBits[32][32];
 
 extern const uint8_t bitmap_A[12][1];
 extern const uint8_t bitmap_M[12][1];
