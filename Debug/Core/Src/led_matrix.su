@@ -1,0 +1,14 @@
+../Core/Src/led_matrix.c:131:6:pulse	16	static
+../Core/Src/led_matrix.c:136:6:set_row_address	16	static
+../Core/Src/led_matrix.c:143:6:setPixel	16	static
+../Core/Src/led_matrix.c:151:6:clearBuffer	8	static
+../Core/Src/led_matrix.c:156:6:HUB75_UpdateScreen	16	static
+../Core/Src/led_matrix.c:189:6:LEDMatrix_TurnOn	16	static
+../Core/Src/led_matrix.c:228:6:LEDMatrix_TurnOff	40	static
+../Core/Src/led_matrix.c:244:6:drawCharBitmap	32	static
+../Core/Src/led_matrix.c:257:6:drawCharBitmap3B	32	static
+../Core/Src/led_matrix.c:271:6:drawDigit	48	static
+../Core/Src/led_matrix.c:298:6:drawClockTime	48	static
+../Core/Src/led_matrix.c:338:6:drawStopNow	16	static
+../Core/Src/led_matrix.c:361:6:drawGo	16	static
+../Core/Src/led_matrix.c:375:6:drawMario	40	static
