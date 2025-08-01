@@ -1,0 +1,6 @@
+../Core/Src/uart_protocol.c:22:6:HAL_UART_RxCpltCallback	16	static
+../Core/Src/uart_protocol.c:30:16:reverse_value	24	static
+../Core/Src/uart_protocol.c:39:16:crc16_calc	24	static
+../Core/Src/uart_protocol.c:52:6:UART_SendFrame	40	static
+../Core/Src/uart_protocol.c:77:6:FSM_ParseByte	16	static
+../Core/Src/uart_protocol.c:110:6:ProcessCommand	56	static
