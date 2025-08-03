@@ -153,7 +153,7 @@ void clearBuffer(void) {
 }
 
 /* ------------------- 화면 갱신 ------------------- */
-void HUB75_UpdateScreen(void) {
+void UpdateMatrix(void) {
     for (uint8_t row = 0; row < HUB75_HEIGHT / 2; row++) {
         set_row_address(row);
 
@@ -206,25 +206,6 @@ void LEDMatrix_TurnOn(void) {
 }
 
 
-//void LEDMatrix_TurnOn(void) {
-//    static uint32_t last_tick = 0;
-//    static int state = 0;
-//
-//    if (!led_enabled) return;
-//
-//    uint32_t now = HAL_GetTick();
-//    if (now - last_tick < 1000) return;
-//    last_tick = now;
-//
-//    clearBuffer();
-//    if (state == 0) {
-//        drawStopNow();
-//    } else {
-//        drawMario(0, 16);
-//    }
-//    state = 1 - state;
-//}
-
 void LEDMatrix_TurnOff(void) {
     RTC_TimeTypeDef sTime;
     RTC_DateTypeDef sDate;
@@ -248,19 +229,6 @@ void drawCharBitmap(uint8_t row, uint8_t col, const uint8_t bitmap[][2]) {
             uint8_t bit_index = 7 - (c % 8);
             if (bitmap[r][byte_index] & (1 << bit_index)) {
                 setPixel(row + r, col + c, 1, 0, 0);  // 빨간색
-            }
-        }
-    }
-}
-
-//GO! Bitmap
-void drawCharBitmap3B(uint8_t row, uint8_t col, const uint8_t bitmap[][3]) {
-    for (uint8_t r = 0; r < 24; r++) {
-        for (uint8_t c = 0; c < 17; c++) {  // 3바이트 → 24비트
-            uint8_t byte_index = c / 8;
-            uint8_t bit_index = 7 - (c % 8);
-            if (bitmap[r][byte_index] & (1 << bit_index)) {
-                setPixel(row + r, col + c, 0, 1, 0);  // green
             }
         }
     }
