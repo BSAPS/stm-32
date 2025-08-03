@@ -17,8 +17,6 @@
 #define RX_BUFFER_SIZE 256
 #define CRC_INIT    0x0000
 #define CRC_POLY    0x8005
-#define IO_REF      1
-#define XOR_OUT     0x0000
 #define MY_ID       3
 extern uint8_t rx_byte;
 extern uint8_t rx_buffer[RX_BUFFER_SIZE];

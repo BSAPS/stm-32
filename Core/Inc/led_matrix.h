@@ -51,7 +51,7 @@ void pulse(GPIO_TypeDef* port, uint16_t pin);
 void set_row_address(uint8_t row);
 void setPixel(uint8_t row, uint8_t col, uint8_t r, uint8_t g, uint8_t b);
 void clearBuffer(void);
-void HUB75_UpdateScreen(void);
+void UpdateMatrix(void);
 
 
 void drawDigit(uint8_t digit, int y, int x);
