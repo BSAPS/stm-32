@@ -131,7 +131,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HUB75_UpdateScreen();
+   UpdateMatrix();
 
     HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
     HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
@@ -165,18 +165,6 @@ int main(void)
                drawMario(0, 16);
                break;
        }
-
-//    // ✅ 시계는 항상 표시
-//    clearBuffer();
-//    //drawClockTime(sTime.Hours, sTime.Minutes, ampm);
-//
-//    if (led_enabled) {
-//            // ⚠️ 경고 상태 (예: STOP/MARIO 표시)
-//            LEDMatrix_TurnOn();  // 내부적으로 toggle 처리
-//        } else {
-//            // 🕒 일반 시계 표시
-//            drawClockTime(sTime.Hours, sTime.Minutes, ampm);
-//        }
 
   }
   /* USER CODE END 3 */
