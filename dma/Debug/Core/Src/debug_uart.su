@@ -1,0 +1,5 @@
+../Core/Src/debug_uart.c:17:6:debug_uart_init	16	static
+../Core/Src/debug_uart.c:19:6:debug_printf	176	static
+../Core/Src/debug_uart.c:32:7:debug_tim1_update_hz	64	static
+../Core/Src/debug_uart.c:47:7:debug_tim1_fps	24	static
+../Core/Src/debug_uart.c:54:6:debug_check_pins	24	static

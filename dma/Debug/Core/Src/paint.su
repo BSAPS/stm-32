@@ -1,0 +1,11 @@
+../Core/Src/paint.c:14:24:addr_word_from_row	24	static
+../Core/Src/paint.c:24:24:cw_from_bits	24	static
+../Core/Src/paint.c:36:23:u8_to_plane	16	static
+../Core/Src/paint.c:42:13:build_from_pixel_fn	72	static
+../Core/Src/paint.c:87:13:pixel_color_bars	32	static
+../Core/Src/paint.c:103:6:paint_color_bars	16	static
+../Core/Src/paint.c:111:13:pixel_checker	32	static
+../Core/Src/paint.c:121:6:paint_checker	16	static
+../Core/Src/paint.c:127:6:paint_checker_scroll	24	static
+../Core/Src/paint.c:136:20:wheel	32	static
+../Core/Src/paint.c:152:6:paint_rainbow_scroll	64	static
