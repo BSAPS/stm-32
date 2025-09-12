@@ -1,0 +1,5 @@
+../Core/Src/debug_uart.c:17:6:debug_uart_init	1
+../Core/Src/debug_uart.c:19:6:debug_printf	4
+../Core/Src/debug_uart.c:32:7:debug_tim1_update_hz	4
+../Core/Src/debug_uart.c:47:7:debug_tim1_fps	2
+../Core/Src/debug_uart.c:54:6:debug_check_pins	4
