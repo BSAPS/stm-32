@@ -45,6 +45,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+RTC_HandleTypeDef hrtc;
+
 TIM_HandleTypeDef htim1;
 DMA_HandleTypeDef hdma_tim1_up;
 
@@ -64,6 +66,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -105,6 +108,7 @@ int main(void)
   MX_DMA_Init();
   MX_USART2_UART_Init();
   MX_TIM1_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
   debug_uart_init(&huart2);
   debug_check_pins();
@@ -128,13 +132,29 @@ int main(void)
 
   // 2) 레인보우: 2프레임마다 hue 1 증가 (부드러운 스크롤)
   //anim_init_rainbow(1024 /* hue_step */, 2 /* frames_per_step */, fb0, fb1);
-  anim_init_rainbow(2048, 1, fb0, fb1);
+  //anim_init_rainbow(2048, 1, fb0, fb1);
+
+
+  // RTC에서 시각 읽기
+  uint8_t hh, mm, ss; bool is_am;
+  rtc_get_hms_ampm(&hh, &mm, &ss, &is_am);
+
+  // 필요 시 12시간제로 정규화 (RTC가 이미 12h면 생략 가능)
+  uint8_t hh12 = (hh == 0) ? 12 : ((hh > 12) ? (hh - 12) : hh);
+  // 색상 선택 (AM=하늘색, PM=주황색)
+  uint8_t fr = is_am ? 135 : 255;
+  uint8_t fg = is_am ? 206 : 165;
+  uint8_t fb = is_am ? 235 :   0;
+
+  paint_time_frame(fb0, hh12, mm, is_am, fr, fg, fb,   0, 0, 0);
+  paint_time_frame(fb1, hh12, mm, is_am, fr, fg, fb,   0, 0, 0);
 
   led_dma_init(&hdma_tim1_up, GPIOB);
   if (led_dma_start(fb0, fb1, LED_WORDS_PER_FRAME) != HAL_OK) Error_Handler();
 
   __HAL_TIM_ENABLE_DMA(&htim1, TIM_DMA_UPDATE);
   HAL_TIM_Base_Start(&htim1);
+
   // 테스트 초기 프레임 생성 + 모드 설정
 
   /* USER CODE END 2 */
@@ -143,8 +163,33 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+	  static uint8_t last_mm = 255;
+	  if (led_dma_take_vsync()) {
+	      rtc_get_hms_ampm(&hh, &mm, &ss, &is_am);
+
+	      if (mm != last_mm) {
+	          last_mm = mm;
+	          // 시/전경색 다시 계산
+			  uint8_t hh12 = (hh == 0) ? 12 : ((hh > 12) ? (hh - 12) : hh);
+			  uint8_t fr = is_am ? 135 : 255;
+			  uint8_t fg = is_am ? 206 : 165;
+			  uint8_t fb = is_am ? 235 :   0;
+
+			  if (led_dma_is_mem_free(LED_MEM0)) {
+			              paint_time_frame(fb0, hh12, mm, is_am, fr, fg, fb,  0,0,0);
+			              led_dma_mark_filled(LED_MEM0);
+			  }
+			  if (led_dma_is_mem_free(LED_MEM1)) {
+				  paint_time_frame(fb1, hh12, mm, is_am, fr, fg, fb,  0,0,0);
+				  led_dma_mark_filled(LED_MEM1);
+			  }
+	      }
+	  }
+
+
     /* USER CODE END WHILE */
-	  anim_service(fb0, fb1);  // vsync마다 빈 버퍼만 리필 → 부드러운 애니메이션
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -167,8 +212,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
@@ -193,6 +239,70 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_12;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* USER CODE BEGIN Check_RTC_BKUP */
+
+  /* USER CODE END Check_RTC_BKUP */
+
+  /** Initialize RTC and set the Time and Date
+  */
+  sTime.Hours = 11;
+  sTime.Minutes = 59;
+  sTime.Seconds = 40;
+  sTime.TimeFormat = RTC_HOURFORMAT12_AM;
+  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+  sDate.Month = RTC_MONTH_SEPTEMBER;
+  sDate.Date = 29;
+  sDate.Year = 25;
+
+  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
+
 }
 
 /**
@@ -368,6 +478,21 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void rtc_get_hms_ampm(uint8_t *hh12, uint8_t *mm, uint8_t *ss, bool *is_am)
+{
+  RTC_TimeTypeDef t; RTC_DateTypeDef d;
+
+  HAL_RTC_GetTime(&hrtc, &t, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &d, RTC_FORMAT_BIN); // 반드시 함께 호출
+
+  *mm = t.Minutes;
+  *ss = t.Seconds;
+  *is_am = (t.TimeFormat == RTC_HOURFORMAT12_AM);
+
+  uint8_t h = t.Hours; if (h == 0) h = 12; // 12h 보호
+  *hh12 = h;
+}
 
 /* USER CODE END 4 */
 

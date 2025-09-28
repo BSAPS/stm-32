@@ -24,10 +24,13 @@ Core/Src/paint.o: ../Core/Src/paint.c ../Core/Inc/paint.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ramfunc.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h \
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rtc.h \
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rtc_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
- ../Core/Inc/dma.h ../Core/Inc/color.h ../Core/Inc/anim.h
+ ../Core/Inc/dma.h ../Core/Inc/color.h ../Core/Inc/anim.h \
+ ../Core/Inc/font.h
 ../Core/Inc/paint.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
@@ -55,9 +58,12 @@ Core/Src/paint.o: ../Core/Src/paint.c ../Core/Inc/paint.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ramfunc.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h:
+../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rtc.h:
+../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rtc_ex.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
 ../Core/Inc/dma.h:
 ../Core/Inc/color.h:
 ../Core/Inc/anim.h:
+../Core/Inc/font.h:

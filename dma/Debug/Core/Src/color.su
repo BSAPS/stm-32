@@ -1,5 +1,2 @@
 ../Core/Src/color.c:17:6:color_set_gamma	16	static
 ../Core/Src/color.c:23:9:color_u8_to_u5	32	static
-../Core/Src/color.c:39:24:addr_word_from_row	24	static
-../Core/Src/color.c:49:24:color_word	24	static
-../Core/Src/color.c:72:6:color_build_solid_frame	56	static

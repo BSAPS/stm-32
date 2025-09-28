@@ -60,8 +60,8 @@ all: main-build
 main-build: DMA_ledmatrix.elf secondary-outputs
 
 # Tool invocations
-DMA_ledmatrix.elf DMA_ledmatrix.map: $(OBJS) $(USER_OBJS) C:\Users\jioh\STM32CubeIDE\workspace_1.18.1\DMA_ledmatrix\STM32F401RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "DMA_ledmatrix.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\jioh\STM32CubeIDE\workspace_1.18.1\DMA_ledmatrix\STM32F401RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="DMA_ledmatrix.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+DMA_ledmatrix.elf DMA_ledmatrix.map: $(OBJS) $(USER_OBJS) C:\Users\jioh\STM32CubeIDE\workspace_1.18.1\stm-32\dma\STM32F401RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "DMA_ledmatrix.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\jioh\STM32CubeIDE\workspace_1.18.1\stm-32\dma\STM32F401RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="DMA_ledmatrix.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
